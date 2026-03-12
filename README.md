@@ -1,3 +1,5 @@
+![20260312161532](https://github.com/user-attachments/assets/43feb474-9552-43ee-a22a-ecc119d62c06)
+
 # Mermaid Flow Studio
 
 一个面向 macOS 的本地 Mermaid `flowchart` 流程图工具，支持编辑、预览、自由调整布局，并导出图片。
