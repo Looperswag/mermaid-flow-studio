@@ -1,7 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 
-if (!SVGElement.prototype.getBBox) {
-  SVGElement.prototype.getBBox = function getBBox() {
+interface SvgElementWithBBox extends SVGElement {
+  getBBox?: () => { x: number; y: number; width: number; height: number };
+}
+
+const svgPrototype = SVGElement.prototype as SvgElementWithBBox;
+
+if (!svgPrototype.getBBox) {
+  svgPrototype.getBBox = function getBBox() {
     const width = Number.parseFloat(this.getAttribute('width') ?? '120');
     const height = Number.parseFloat(this.getAttribute('height') ?? '40');
 
