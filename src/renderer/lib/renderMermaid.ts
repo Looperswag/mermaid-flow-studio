@@ -1,5 +1,6 @@
 import mermaid from 'mermaid';
 
+import { sanitizeSvg } from './sanitizeSvg';
 import { stripMermaidFence } from './validateMermaid';
 
 export type DiagramTheme = 'light' | 'dark';
@@ -59,12 +60,17 @@ export function configureMermaid(theme: DiagramTheme) {
     // is injected via dangerouslySetInnerHTML and the app can open external .mmd files,
     // so untrusted source must not be able to inject script or reach the IPC bridge.
     securityLevel: 'strict',
+    // Force SVG <text> labels everywhere (node labels read the top-level flag in v11).
+    htmlLabels: false,
     theme: 'base',
     themeVariables: themePresets[theme],
     flowchart: {
       curve: 'basis',
       useMaxWidth: false,
-      htmlLabels: true,
+      // Render labels as native SVG <text> rather than HTML in <foreignObject>. This both
+      // removes the HTML-in-SVG attack surface and lets the DOMPurify pass (sanitizeSvg)
+      // preserve labels — DOMPurify drops foreignObject's XHTML content.
+      htmlLabels: false,
     },
   });
 
@@ -126,8 +132,11 @@ export async function renderMermaid(
   const renderId = `mermaid-flow-${renderCount += 1}`;
   const { svg } = await mermaid.render(renderId, stripMermaidFence(source));
 
+  // Defense-in-depth: sanitize the SVG once more before it is injected into the DOM.
+  const safeSvg = sanitizeSvg(normalizeSvg(svg));
+
   return {
-    svg: normalizeSvg(svg),
-    dimensions: extractSvgDimensions(svg),
+    svg: safeSvg,
+    dimensions: extractSvgDimensions(safeSvg),
   };
 }
