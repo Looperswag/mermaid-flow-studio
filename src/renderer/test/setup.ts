@@ -1,10 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 
-interface SvgElementWithBBox extends SVGElement {
+interface SvgElementWithMeasurement extends SVGElement {
   getBBox?: () => { x: number; y: number; width: number; height: number };
+  getComputedTextLength?: () => number;
 }
 
-const svgPrototype = SVGElement.prototype as SvgElementWithBBox;
+const svgPrototype = SVGElement.prototype as SvgElementWithMeasurement;
 
 if (!svgPrototype.getBBox) {
   svgPrototype.getBBox = function getBBox() {
@@ -17,5 +18,13 @@ if (!svgPrototype.getBBox) {
       width: Number.isFinite(width) ? width : 120,
       height: Number.isFinite(height) ? height : 40,
     };
+  };
+}
+
+// jsdom does not measure SVG text. With htmlLabels=false Mermaid measures labels via
+// getComputedTextLength, so provide a deterministic approximation for tests.
+if (!svgPrototype.getComputedTextLength) {
+  svgPrototype.getComputedTextLength = function getComputedTextLength() {
+    return (this.textContent?.length ?? 0) * 8;
   };
 }

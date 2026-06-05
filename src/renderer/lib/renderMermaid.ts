@@ -30,7 +30,14 @@ const defaultThemeVariables = {
 function ensureMermaidInitialized(options?: RenderMermaidOptions) {
   mermaid.initialize({
     startOnLoad: false,
-    securityLevel: 'loose',
+    // 'strict' sanitizes label HTML and disables click/href handlers. The rendered SVG is
+    // injected via dangerouslySetInnerHTML and the app opens external .mmd files, so
+    // untrusted source must not be able to inject script or reach the IPC bridge.
+    securityLevel: 'strict',
+    // Render labels as native SVG <text> (not HTML in <foreignObject>). Removes the
+    // HTML-in-SVG attack surface, keeps free-layout node sizing working (it reads
+    // rect.label-container), and lets the DOMPurify pass preserve labels.
+    htmlLabels: false,
     theme: 'base',
     themeVariables: {
       ...defaultThemeVariables,
@@ -39,7 +46,7 @@ function ensureMermaidInitialized(options?: RenderMermaidOptions) {
     flowchart: {
       curve: 'basis',
       useMaxWidth: false,
-      htmlLabels: true,
+      htmlLabels: false,
     },
   });
 }
