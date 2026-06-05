@@ -55,7 +55,10 @@ export function configureMermaid(theme: DiagramTheme) {
 
   mermaid.initialize({
     startOnLoad: false,
-    securityLevel: 'loose',
+    // 'strict' sanitizes HTML in labels and disables click handlers. The rendered SVG
+    // is injected via dangerouslySetInnerHTML and the app can open external .mmd files,
+    // so untrusted source must not be able to inject script or reach the IPC bridge.
+    securityLevel: 'strict',
     theme: 'base',
     themeVariables: themePresets[theme],
     flowchart: {

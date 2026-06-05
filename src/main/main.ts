@@ -65,7 +65,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      // Defense in depth: the preload only uses contextBridge + ipcRenderer, which are
+      // sandbox-compatible, so any residual renderer compromise stays off the Node side.
+      sandbox: true,
     },
   });
 
