@@ -11,11 +11,7 @@ vi.mock('./lib/renderDiagramPresentation', () => ({
         <g class="node default" id="flowchart-A-0" transform="translate(40 40)">
           <rect class="label-container" x="-20" y="-10" width="40" height="20"></rect>
           <g class="label" transform="translate(-15 -8)">
-            <foreignObject width="40" height="20">
-              <div xmlns="http://www.w3.org/1999/xhtml">
-                <span class="nodeLabel"><p>Old label</p></span>
-              </div>
-            </foreignObject>
+            <text class="nodeLabel" x="0" y="0">Old label</text>
           </g>
         </g>
       </svg>
@@ -41,12 +37,12 @@ test('updates node text from the free-mode editor', async () => {
   await user.click(screen.getByRole('button', { name: /open/i }));
   await user.click(screen.getByRole('radio', { name: /free/i }));
 
-  const nodeLabel = document.querySelector('[data-node-key="A"] span.nodeLabel');
-  if (!nodeLabel) {
-    throw new Error('Expected node label.');
+  const node = document.querySelector('[data-node-key="A"]');
+  if (!node) {
+    throw new Error('Expected interactive node.');
   }
 
-  fireEvent.pointerDown(nodeLabel, { button: 0, clientX: 40, clientY: 40 });
+  fireEvent.pointerDown(node, { button: 0, clientX: 40, clientY: 40 });
 
   const nodeTextInput = await screen.findByRole('textbox', { name: /node text/i });
   await user.clear(nodeTextInput);

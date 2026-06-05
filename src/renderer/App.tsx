@@ -23,6 +23,7 @@ import { diagramPalettes } from './lib/diagramPalettes';
 import { extractFlowchartNodeKeys } from './lib/extractFlowchartNodeKeys';
 import { buildExportBlob, buildExportFileName } from './lib/exportDiagram';
 import { readFlowchartNodeText, updateFlowchartNodeText } from './lib/flowchartNodeText';
+import { sanitizeSvg } from './lib/sanitizeSvg';
 import { mergePersistedLayouts } from './lib/mergePersistedLayouts';
 import { fitScaleToContainer } from './lib/previewFit';
 import {
@@ -101,7 +102,20 @@ export default function App() {
   const [isRendering, setIsRendering] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(null);
+  // True while the preview should auto-fit (follows window/diagram); a manual zoom turns it off.
+  const [fitMode, setFitMode] = useState(true);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  // Monotonic render token so a slow in-flight render can't overwrite a newer result.
+  const renderTokenRef = useRef(0);
+  // Last source we kicked off a render for; de-dupes the debounce vs. explicit renders.
+  const lastRenderedSourceRef = useRef<string | null>(null);
+  const isFirstRenderRef = useRef(true);
+  // Refs mirrored from state/props for the ResizeObserver callback.
+  const fitModeRef = useRef(fitMode);
+  fitModeRef.current = fitMode;
+  const previewDimsRef = useRef<SvgDimensions | null>(null);
+  previewDimsRef.current = preview?.dimensions ?? null;
 
   const desktop = window.mermaidApp ?? browserFallback;
 
@@ -136,9 +150,15 @@ export default function App() {
     mode: 'auto' | 'manual' = 'manual',
     nextCustomization = customization,
   ) {
+    lastRenderedSourceRef.current = nextSource;
+    // Claim the token before validating so an invalid edit supersedes any in-flight render.
+    const token = (renderTokenRef.current += 1);
+
     const validation = validateMermaid(nextSource);
     if (!validation.valid) {
+      // Keep the last good preview on screen; only surface the error.
       setStatus(statusFrom('error', 'Unable to render', validation.message));
+      setIsRendering(false);
       return;
     }
 
@@ -148,9 +168,7 @@ export default function App() {
         statusFrom(
           'working',
           'Rendering flowchart',
-          mode === 'auto'
-            ? '正在为默认示例生成节点图。'
-            : '正在把当前 Mermaid 内容转换为节点图。',
+          mode === 'auto' ? '正在自动渲染最新的 Mermaid 内容。' : '正在渲染当前 Mermaid 内容。',
         ),
       );
       const rendered = await renderDiagramPresentation({
@@ -158,16 +176,22 @@ export default function App() {
         paletteId: nextCustomization.paletteId,
         direction: nextCustomization.direction,
       });
+      if (token !== renderTokenRef.current) {
+        return; // A newer render started; drop this stale result.
+      }
       const nextPreview = buildPreviewState(rendered, nextCustomization, nextSource);
       setPreview(nextPreview);
-      setPreviewScale(fitScaleToContainer(previewRef.current, nextPreview.dimensions));
-      setStatus(
-        statusFrom('success', 'Diagram ready', '流程图已生成，可以继续缩放或导出图片。'),
-      );
+      setStatus(statusFrom('success', 'Diagram ready', '流程图已更新，可以继续缩放或导出图片。'));
     } catch (error) {
+      if (token !== renderTokenRef.current) {
+        return;
+      }
+      // Preserve the previous preview; surface the error.
       setStatus(statusFrom('error', 'Render failed', formatError(error)));
     } finally {
-      setIsRendering(false);
+      if (token === renderTokenRef.current) {
+        setIsRendering(false);
+      }
     }
   }
 
@@ -193,29 +217,65 @@ export default function App() {
 
     return {
       base: basePresentation,
-      svg: interactiveDiagram.svg,
+      // Defense-in-depth: sanitize the final SVG before it is injected into the DOM.
+      // DOMPurify preserves the free-layout data-node-* attributes and SVG text labels.
+      svg: sanitizeSvg(interactiveDiagram.svg),
       dimensions: interactiveDiagram.dimensions,
       nodeLayouts: interactiveDiagram.nodeLayouts,
     };
   }
 
+  // Debounced live render: re-render whenever the source changes (first run is immediate).
   useEffect(() => {
     if (import.meta.env.MODE === 'test') {
       return;
     }
-
-    void renderSource(defaultDiagram, 'auto', buildDefaultCustomization());
-    // The default sample is static for the whole app lifecycle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!preview) {
+    const isFirst = isFirstRenderRef.current;
+    isFirstRenderRef.current = false;
+    // Skip if an explicit render already handled this exact source.
+    if (!isFirst && source === lastRenderedSourceRef.current) {
       return;
     }
+    const id = window.setTimeout(
+      () => {
+        void renderSource(source, 'auto');
+      },
+      isFirst ? 0 : 450,
+    );
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source]);
 
+  // Auto-fit when a new diagram renders, but only while the user hasn't manually zoomed.
+  useEffect(() => {
+    if (!preview || !fitMode) {
+      return;
+    }
     setPreviewScale(fitScaleToContainer(previewRef.current, preview.dimensions));
-  }, [preview]);
+  }, [preview, fitMode]);
+
+  // Track container size and re-fit on window/pane resize while in fit mode.
+  useEffect(() => {
+    const container = previewRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!fitModeRef.current || !previewDimsRef.current) {
+          return;
+        }
+        setPreviewScale(fitScaleToContainer(container, previewDimsRef.current));
+      });
+    });
+    observer.observe(container);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedNodeKey) {
@@ -403,13 +463,7 @@ export default function App() {
                   { rerender: true },
                 );
               }}
-              onFit={() => {
-                if (!preview) {
-                  return;
-                }
-
-                setPreviewScale(fitScaleToContainer(previewRef.current, preview.dimensions));
-              }}
+              onFit={() => setFitMode(true)}
               onLayoutModeChange={(layoutMode) => {
                 updateCustomization((current) => ({
                   ...current,
@@ -428,9 +482,18 @@ export default function App() {
                   { rerender: true },
                 );
               }}
-              onReset={() => setPreviewScale(1)}
-              onZoomIn={() => setPreviewScale((current) => clampScale(current + 0.1))}
-              onZoomOut={() => setPreviewScale((current) => clampScale(current - 0.1))}
+              onReset={() => {
+                setFitMode(false);
+                setPreviewScale(1);
+              }}
+              onZoomIn={() => {
+                setFitMode(false);
+                setPreviewScale((current) => clampScale(current + 0.1));
+              }}
+              onZoomOut={() => {
+                setFitMode(false);
+                setPreviewScale((current) => clampScale(current - 0.1));
+              }}
             />
           </div>
         </main>
