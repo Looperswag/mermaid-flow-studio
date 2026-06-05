@@ -1,8 +1,8 @@
 {
   "name": "mermaid-flow-studio",
   "private": true,
-  "version": "0.2.0",
-  "description": "Offline macOS Mermaid flowchart renderer with a chatbot-inspired UI.",
+  "version": "0.3.0",
+  "description": "Offline macOS Mermaid flowchart renderer with live preview, window-adaptive fit, and a customizable, free-layout canvas.",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
