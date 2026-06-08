@@ -59,7 +59,7 @@
 
 ## 💾 安装（使用打包好的 .dmg）
 
-1. 前往 [Releases 页面](https://github.com/Looperswag/mermaid-flow-studio/releases)，下载最新的 `Mermaid Flow Studio-<版本>-arm64.dmg`（Apple Silicon）。
+1. 前往 [Releases 页面](https://github.com/Looperswag/mermaid-flow-studio/releases)，下载最新的 `Mermaid Flow Studio-<版本>-universal.dmg`（Intel 与 Apple Silicon 通用）。
 2. 打开 dmg，将 `Mermaid Flow Studio.app` 拖到 `Applications`。
 3. 首次启动若被 macOS 拦截，请右键应用选择 `打开`，确认一次后即可正常使用。
 
