@@ -1,6 +1,7 @@
 import type { DiagramDirection, DiagramLayoutMode } from '@shared/diagram-customization';
 
 import {
+  memo,
   useEffect,
   useRef,
   useState,
@@ -105,7 +106,7 @@ function findNodeFromPoint(container: HTMLDivElement, clientX: number, clientY: 
   return null;
 }
 
-export function PreviewPanel({
+function PreviewPanelComponent({
   direction,
   layoutMode,
   paletteId,
@@ -281,16 +282,16 @@ export function PreviewPanel({
           </div>
 
           <div className="preview-panel__actions">
-            <button type="button" className="ghost-button" onClick={onZoomOut}>
+            <button type="button" className="ghost-button" onClick={onZoomOut} title="Zoom out (⌘-)">
               Zoom out
             </button>
-            <button type="button" className="ghost-button" onClick={onZoomIn}>
+            <button type="button" className="ghost-button" onClick={onZoomIn} title="Zoom in (⌘+)">
               Zoom in
             </button>
-            <button type="button" className="ghost-button" onClick={onReset}>
+            <button type="button" className="ghost-button" onClick={onReset} title="Actual size (⌘0)">
               100%
             </button>
-            <button type="button" className="accent-button" onClick={onFit}>
+            <button type="button" className="accent-button" onClick={onFit} title="Fit to view (⌘⇧0)">
               Fit to view
             </button>
           </div>
@@ -355,3 +356,5 @@ export function PreviewPanel({
     </section>
   );
 }
+
+export const PreviewPanel = memo(PreviewPanelComponent);
